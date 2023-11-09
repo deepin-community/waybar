@@ -28,6 +28,11 @@ Workspaces::Workspaces(const std::string &id, const Bar &bar, const Json::Value 
     : AModule(config, "workspaces", id, false, !config["disable-scroll"].asBool()),
       bar_(bar),
       box_(bar.vertical ? Gtk::ORIENTATION_VERTICAL : Gtk::ORIENTATION_HORIZONTAL, 0) {
+  if (config["format-icons"]["high-priority-named"].isArray()) {
+    for (auto &it : config["format-icons"]["high-priority-named"]) {
+      high_priority_named_.push_back(it.asString());
+    }
+  }
   box_.set_name("workspaces");
   if (!id.empty()) {
     box_.get_style_context()->add_class(id);
@@ -130,6 +135,10 @@ void Workspaces::onCmd(const struct Ipc::ipc_response &res) {
         // In a first pass, the maximum "num" value is computed to enqueue
         // unnumbered workspaces behind numbered ones when computing the sort
         // attribute.
+        //
+        // Note: if the 'alphabetical_sort' option is true, the user is in
+        // agreement that the "workspace prev/next" commands may not follow
+        // the order displayed in Waybar.
         int max_num = -1;
         for (auto &workspace : workspaces_) {
           max_num = std::max(workspace["num"].asInt(), max_num);
@@ -143,16 +152,19 @@ void Workspaces::onCmd(const struct Ipc::ipc_response &res) {
           }
         }
         std::sort(workspaces_.begin(), workspaces_.end(),
-                  [](const Json::Value &lhs, const Json::Value &rhs) {
+                  [this](const Json::Value &lhs, const Json::Value &rhs) {
                     auto lname = lhs["name"].asString();
                     auto rname = rhs["name"].asString();
                     int l = lhs["sort"].asInt();
                     int r = rhs["sort"].asInt();
 
-                    if (l == r) {
+                    if (l == r || config_["alphabetical_sort"].asBool()) {
                       // In case both integers are the same, lexicographical
                       // sort. The code above already ensure that this will only
-                      // happend in case of explicitly numbered workspaces.
+                      // happened in case of explicitly numbered workspaces.
+                      //
+                      // Additionally, if the config specifies to sort workspaces
+                      // alphabetically do this here.
                       return lname < rname;
                     }
 
@@ -226,9 +238,10 @@ auto Workspaces::update() -> void {
     std::string output = (*it)["name"].asString();
     if (config_["format"].isString()) {
       auto format = config_["format"].asString();
-      output = fmt::format(format, fmt::arg("icon", getIcon(output, *it)),
+      output = fmt::format(fmt::runtime(format), fmt::arg("icon", getIcon(output, *it)),
                            fmt::arg("value", output), fmt::arg("name", trimWorkspaceName(output)),
-                           fmt::arg("index", (*it)["num"].asString()));
+                           fmt::arg("index", (*it)["num"].asString()),
+                           fmt::arg("output", (*it)["output"].asString()));
     }
     if (!config_["disable-markup"].asBool()) {
       static_cast<Gtk::Label *>(button.get_children()[0])->set_markup(output);
@@ -252,11 +265,9 @@ Gtk::Button &Workspaces::addButton(const Json::Value &node) {
       try {
         if (node["target_output"].isString()) {
           ipc_.sendCmd(IPC_COMMAND,
-                       fmt::format(workspace_switch_cmd_ + "; move workspace to output \"{}\"; " +
-                                       workspace_switch_cmd_,
-                                   "--no-auto-back-and-forth", node["name"].asString(),
-                                   node["target_output"].asString(), "--no-auto-back-and-forth",
-                                   node["name"].asString()));
+                       fmt::format(persistent_workspace_switch_cmd_, "--no-auto-back-and-forth",
+                                   node["name"].asString(), node["target_output"].asString(),
+                                   "--no-auto-back-and-forth", node["name"].asString()));
         } else {
           ipc_.sendCmd(IPC_COMMAND, fmt::format("workspace {} \"{}\"",
                                                 config_["disable-auto-back-and-forth"].asBool()
@@ -273,9 +284,24 @@ Gtk::Button &Workspaces::addButton(const Json::Value &node) {
 }
 
 std::string Workspaces::getIcon(const std::string &name, const Json::Value &node) {
-  std::vector<std::string> keys = {name, "urgent", "focused", "visible", "default"};
+  std::vector<std::string> keys = {"high-priority-named", "urgent", "focused", name, "default"};
   for (auto const &key : keys) {
-    if (key == "focused" || key == "visible" || key == "urgent") {
+    if (key == "high-priority-named") {
+      auto it = std::find_if(high_priority_named_.begin(), high_priority_named_.end(),
+                             [&](const std::string &member) { return member == name; });
+      if (it != high_priority_named_.end()) {
+        return config_["format-icons"][name].asString();
+      }
+
+      it = std::find_if(high_priority_named_.begin(), high_priority_named_.end(),
+                        [&](const std::string &member) {
+                          return trimWorkspaceName(member) == trimWorkspaceName(name);
+                        });
+      if (it != high_priority_named_.end()) {
+        return config_["format-icons"][trimWorkspaceName(name)].asString();
+      }
+    }
+    if (key == "focused" || key == "urgent") {
       if (config_["format-icons"][key].isString() && node[key].asBool()) {
         return config_["format-icons"][key].asString();
       }
@@ -321,10 +347,16 @@ bool Workspaces::handleScroll(GdkEventScroll *e) {
       return true;
     }
   }
+  if (!config_["warp-on-scroll"].isNull() && !config_["warp-on-scroll"].asBool()) {
+    ipc_.sendCmd(IPC_COMMAND, fmt::format("mouse_warping none"));
+  }
   try {
     ipc_.sendCmd(IPC_COMMAND, fmt::format(workspace_switch_cmd_, "--no-auto-back-and-forth", name));
   } catch (const std::exception &e) {
     spdlog::error("Workspaces: {}", e.what());
+  }
+  if (!config_["warp-on-scroll"].isNull() && !config_["warp-on-scroll"].asBool()) {
+    ipc_.sendCmd(IPC_COMMAND, fmt::format("mouse_warping container"));
   }
   return true;
 }

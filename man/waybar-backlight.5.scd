@@ -25,12 +25,12 @@ The *backlight* module displays the current backlight level.
 	The maximum length in characters the module should display.
 
 *min-length*: ++
-    typeof: integer ++
-    The minimum length in characters the module should take up.
+	typeof: integer ++
+	The minimum length in characters the module should take up.
 
 *align*: ++
-    typeof: float ++
-    The alignment of the text, where 0 is left-aligned and 1 is right-aligned. If the module is rotated, it will follow the flow of the text.
+	typeof: float ++
+	The alignment of the text, where 0 is left-aligned and 1 is right-aligned. If the module is rotated, it will follow the flow of the text.
 
 *rotate*: ++
 	typeof: integer ++
@@ -58,23 +58,32 @@ The *backlight* module displays the current backlight level.
 
 *on-scroll-up*: ++
 	typeof: string ++
-	Command to execute when performing a scroll up on the module.
+	Command to execute when performing a scroll up on the module. This replaces the default behaviour of brightness control.
 
 *on-scroll-down*: ++
 	typeof: string
-	Command to execute when performing a scroll down on the module.
+	Command to execute when performing a scroll down on the module. This replaces the default behaviour of brightness control.
 
 *smooth-scrolling-threshold*: ++
 	typeof: double
 	Threshold to be used when scrolling.
 
+*reverse-scrolling*: ++
+	typeof: bool ++
+	Option to reverse the scroll direction.
+
+*scroll-step*: ++
+	typeof: float ++
+	default: 1.0 ++
+	The speed in which to change the brightness when scrolling.
+
 # EXAMPLE:
 
 ```
 "backlight": {
-    "device": "intel_backlight",
-    "format": "{percent}% {icon}",
-    "format-icons": ["", ""]
+	"device": "intel_backlight",
+	"format": "{percent}% {icon}",
+	"format-icons": ["", ""]
 }
 ```
 

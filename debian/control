@@ -16,7 +16,6 @@ Build-Depends:
  libpulse-dev,
  libnl-3-dev,
  libspdlog-dev (>=1.8.0),
- libdbusmenu-gtk-dev,
  cmake,
  libfmt-dev (>=5.3.0),
  libnl-genl-3-dev,
@@ -27,9 +26,12 @@ Build-Depends:
  libgtk-layer-shell0,
  libxkbregistry-dev,
  libupower-glib-dev,
- libjack-dev,
+ libjack-jackd2-dev,
  libsndio-dev,
-Standards-Version: 4.6.1.0
+ libwireplumber-0.4-dev,
+ libhowardhinnant-date-dev,
+ libplayerctl-dev
+Standards-Version: 4.6.2
 Homepage: https://github.com/Alexays/Waybar/
 Vcs-Browser: https://salsa.debian.org/swaywm-team/waybar
 Vcs-Git: https://salsa.debian.org/swaywm-team/waybar.git
